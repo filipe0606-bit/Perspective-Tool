@@ -7,13 +7,12 @@
     <style>
         body { margin: 0; overflow: hidden; background: #ffffff; font-family: sans-serif; }
         
-        /* touch-action: none apenas no canvas para permitir rotação sem arrastar a página */
         canvas { display: block; touch-action: none; position: fixed; top: 0; left: 0; }
 
         .control-box { 
             position: absolute; z-index: 100; background: #fff; display: flex; 
             box-shadow: 0 4px 15px rgba(0,0,0,0.15); overflow: hidden;
-            touch-action: auto; /* Garante que o toque funcione nos menus */
+            touch-action: auto;
         }
         
         #ui-z { top: 10px; left: 10px; border: 8px solid #1976d2; border-radius: 12px; }
@@ -26,10 +25,16 @@
         }
         #ui-logo img { display: block; width: 100px; height: auto; background: transparent; }
 
+        /* REDUÇÃO PARA MOBILE */
+        @media (max-width: 768px) {
+            #ui-logo img { width: 50px; }
+            #ui-logo { bottom: 15px; right: 10px; }
+        }
+
         select { 
             font-size: 20px; font-weight: bold; padding: 8px; cursor: pointer; 
             border: none; background: transparent; min-width: 70px; outline: none;
-            -webkit-appearance: none; /* Melhora renderização no iOS */
+            -webkit-appearance: none;
         }
     </style>
 </head>
@@ -48,9 +53,8 @@
     const ctx = canvas.getContext('2d');
     let w, h, zoom = 250, ax = 0.5, ay = 0.5, drag = false, lx, ly;
     let cur = [2.0, 2.0, 2.0];
-    let initialDist = null; // Para o Pinch Zoom
+    let initialDist = null;
 
-    // Configuração dos Menus
     ['sel-x', 'sel-y', 'sel-z'].forEach((id, idx) => {
         const s = document.getElementById(id);
         for(let i = 1; i <= 20; i++) {
@@ -81,18 +85,9 @@
 
     function draw() {
         ctx.clearRect(0, 0, w, h);
-        const v = [
-            {x:-cur[0],y:-cur[1],z:-cur[2]},{x:cur[0],y:-cur[1],z:-cur[2]},
-            {x:cur[0],y:cur[1],z:-cur[2]},{x:-cur[0],y:cur[1],z:-cur[2]},
-            {x:-cur[0],y:-cur[1],z:cur[2]},{x:cur[0],y:-cur[1],z:cur[2]},
-            {x:cur[0],y:cur[1],z:cur[2]},{x:-cur[0],y:cur[1],z:cur[2]}
-        ];
+        const v = [{x:-cur[0],y:-cur[1],z:-cur[2]},{x:cur[0],y:-cur[1],z:-cur[2]},{x:cur[0],y:cur[1],z:-cur[2]},{x:-cur[0],y:cur[1],z:-cur[2]},{x:-cur[0],y:-cur[1],z:cur[2]},{x:cur[0],y:-cur[1],z:cur[2]},{x:cur[0],y:cur[1],z:cur[2]},{x:-cur[0],y:cur[1],z:cur[2]}];
         const vps = [proj(1,0,0,1000), proj(0,1,0,1000), proj(0,0,1,1000)];
-        const edges = [
-            [0,1,'#d32f2f',0],[3,2,'#d32f2f',0],[4,5,'#d32f2f',0],[6,7,'#d32f2f',0],
-            [0,3,'#388e3c',1],[1,2,'#388e3c',1],[4,7,'#388e3c',1],[5,6,'#388e3c',1],
-            [0,4,'#1976d2',2],[1,5,'#1976d2',2],[2,6,'#1976d2',2],[3,7,'#1976d2',2]
-        ];
+        const edges = [[0,1,'#d32f2f',0],[3,2,'#d32f2f',0],[4,5,'#d32f2f',0],[6,7,'#d32f2f',0],[0,3,'#388e3c',1],[1,2,'#388e3c',1],[4,7,'#388e3c',1],[5,6,'#388e3c',1],[0,4,'#1976d2',2],[1,5,'#1976d2',2],[2,6,'#1976d2',2],[3,7,'#1976d2',2]];
 
         ctx.setLineDash([8,6]); ctx.strokeStyle = '#bbb'; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(vps[1].x, 0); ctx.lineTo(vps[1].x, h); ctx.stroke();
@@ -110,47 +105,30 @@
             ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
         });
 
-        vps.forEach(p => { 
-            ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, 7); ctx.fillStyle = '#000'; ctx.fill(); 
-        });
+        vps.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, 7); ctx.fillStyle = '#000'; ctx.fill(); });
         requestAnimationFrame(draw);
     }
 
-    // Mouse
     canvas.onmousedown = (e) => { drag = true; lx = e.clientX; ly = e.clientY; };
     window.onmousemove = (e) => { if(drag) { ay += (e.clientX - lx)*0.005; ax += (e.clientY - ly)*0.005; lx = e.clientX; ly = e.clientY; }};
     window.onmouseup = () => drag = false;
     window.onwheel = (e) => { zoom = Math.max(50, zoom - e.deltaY * 0.5); };
 
-    // Touch (iOS / Android)
     canvas.addEventListener('touchstart', (e) => {
-        if (e.touches.length === 1) {
-            drag = true;
-            lx = e.touches[0].clientX;
-            ly = e.touches[0].clientY;
-        } else if (e.touches.length === 2) {
-            drag = false; // Cancela rotação para priorizar zoom
-            initialDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-        }
+        if (e.touches.length === 1) { drag = true; lx = e.touches[0].clientX; ly = e.touches[0].clientY; }
+        else if (e.touches.length === 2) { drag = false; initialDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY); }
     }, { passive: false });
 
     window.addEventListener('touchmove', (e) => {
-        if (e.touches.length === 1 && drag) {
-            ay += (e.touches[0].clientX - lx) * 0.008;
-            ax += (e.touches[0].clientY - ly) * 0.008;
-            lx = e.touches[0].clientX;
-            ly = e.touches[0].clientY;
-        } else if (e.touches.length === 2 && initialDist !== null) {
+        if (e.touches.length === 1 && drag) { ay += (e.touches[0].clientX - lx) * 0.008; ax += (e.touches[0].clientY - ly) * 0.008; lx = e.touches[0].clientX; ly = e.touches[0].clientY; }
+        else if (e.touches.length === 2 && initialDist !== null) {
             let dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-            let diff = dist - initialDist;
-            zoom = Math.max(50, zoom + diff * 1.5);
-            initialDist = dist;
+            let diff = dist - initialDist; zoom = Math.max(50, zoom + diff * 1.5); initialDist = dist;
         }
         if(e.target === canvas) e.preventDefault();
     }, { passive: false });
 
     window.addEventListener('touchend', () => { drag = false; initialDist = null; });
-
     draw();
 })();
 </script>
