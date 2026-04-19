@@ -2,35 +2,35 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Trying to Draw - Perspective Tool</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #ffffff; font-family: sans-serif; touch-action: none; }
+        body { margin: 0; overflow: hidden; background: #ffffff; font-family: sans-serif; }
+        
+        /* touch-action: none apenas no canvas para permitir rotação sem arrastar a página */
+        canvas { display: block; touch-action: none; position: fixed; top: 0; left: 0; }
+
         .control-box { 
             position: absolute; z-index: 100; background: #fff; display: flex; 
             box-shadow: 0 4px 15px rgba(0,0,0,0.15); overflow: hidden;
+            touch-action: auto; /* Garante que o toque funcione nos menus */
         }
+        
         #ui-z { top: 10px; left: 10px; border: 8px solid #1976d2; border-radius: 12px; }
         #ui-x { top: 10px; right: 10px; border: 8px solid #d32f2f; border-radius: 12px; }
         #ui-y { bottom: 25px; left: 10px; border: 8px solid #388e3c; border-radius: 12px; }
         
-        /* Estilo do Logo - Flat e sem moldura */
         #ui-logo {
-            position: absolute;
-            bottom: 25px;
-            right: 15px;
-            z-index: 100;
+            position: absolute; bottom: 25px; right: 15px; z-index: 100;
             pointer-events: none;
         }
-        #ui-logo img {
-            display: block;
-            width: 100px; /* Tamanho ajustável */
-            height: auto;
-            background: transparent;
-        }
+        #ui-logo img { display: block; width: 100px; height: auto; background: transparent; }
 
-        select { font-size: 20px; font-weight: bold; padding: 8px; cursor: pointer; border: none; background: transparent; min-width: 70px; outline: none; }
-        canvas { display: block; }
+        select { 
+            font-size: 20px; font-weight: bold; padding: 8px; cursor: pointer; 
+            border: none; background: transparent; min-width: 70px; outline: none;
+            -webkit-appearance: none; /* Melhora renderização no iOS */
+        }
     </style>
 </head>
 <body>
@@ -38,9 +38,7 @@
     <div id="ui-x" class="control-box"><select id="sel-x"></select></div>
     <div id="ui-y" class="control-box"><select id="sel-y"></select></div>
 
-    <div id="ui-logo">
-        <img src="logo.png" alt="Trying to Draw">
-    </div>
+    <div id="ui-logo"><img src="logo.png" alt="Trying to Draw"></div>
 
     <canvas id="c"></canvas>
 
@@ -50,14 +48,14 @@
     const ctx = canvas.getContext('2d');
     let w, h, zoom = 250, ax = 0.5, ay = 0.5, drag = false, lx, ly;
     let cur = [2.0, 2.0, 2.0];
+    let initialDist = null; // Para o Pinch Zoom
 
     // Configuração dos Menus
     ['sel-x', 'sel-y', 'sel-z'].forEach((id, idx) => {
         const s = document.getElementById(id);
         for(let i = 1; i <= 20; i++) {
             let opt = document.createElement('option');
-            opt.value = i * 0.5;
-            opt.innerHTML = i;
+            opt.value = i * 0.5; opt.innerHTML = i;
             if(i === 4) opt.selected = true;
             s.appendChild(opt);
         }
@@ -83,14 +81,12 @@
 
     function draw() {
         ctx.clearRect(0, 0, w, h);
-        
         const v = [
             {x:-cur[0],y:-cur[1],z:-cur[2]},{x:cur[0],y:-cur[1],z:-cur[2]},
             {x:cur[0],y:cur[1],z:-cur[2]},{x:-cur[0],y:cur[1],z:-cur[2]},
             {x:-cur[0],y:-cur[1],z:cur[2]},{x:cur[0],y:-cur[1],z:cur[2]},
             {x:cur[0],y:cur[1],z:cur[2]},{x:-cur[0],y:cur[1],z:cur[2]}
         ];
-        
         const vps = [proj(1,0,0,1000), proj(0,1,0,1000), proj(0,0,1,1000)];
         const edges = [
             [0,1,'#d32f2f',0],[3,2,'#d32f2f',0],[4,5,'#d32f2f',0],[6,7,'#d32f2f',0],
@@ -98,22 +94,18 @@
             [0,4,'#1976d2',2],[1,5,'#1976d2',2],[2,6,'#1976d2',2],[3,7,'#1976d2',2]
         ];
 
-        // Grid (Horizonte e Vertical)
         ctx.setLineDash([8,6]); ctx.strokeStyle = '#bbb'; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(vps[1].x, 0); ctx.lineTo(vps[1].x, h); ctx.stroke();
         let dx = vps[2].x - vps[0].x, dy = vps[2].y - vps[0].y;
         ctx.beginPath(); ctx.moveTo(vps[0].x - dx*10, vps[0].y - dy*10); ctx.lineTo(vps[2].x + dx*10, vps[2].y + dy*10); ctx.stroke();
         ctx.setLineDash([]);
 
-        // Desenho do Cubo e Convergência
         edges.forEach(e => {
             let p1 = proj(v[e[0]].x, v[e[0]].y, v[e[0]].z);
             let p2 = proj(v[e[1]].x, v[e[1]].y, v[e[1]].z);
             let vp = vps[e[3]];
-            
             ctx.globalAlpha = 0.5; ctx.strokeStyle = e[2]; ctx.lineWidth = 2.5;
             ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(vp.x, vp.y); ctx.stroke();
-
             ctx.globalAlpha = 1.0; ctx.strokeStyle = '#000'; ctx.lineWidth = 4.5; ctx.lineCap = 'round';
             ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
         });
@@ -124,17 +116,40 @@
         requestAnimationFrame(draw);
     }
 
-    // Interação
+    // Mouse
     canvas.onmousedown = (e) => { drag = true; lx = e.clientX; ly = e.clientY; };
     window.onmousemove = (e) => { if(drag) { ay += (e.clientX - lx)*0.005; ax += (e.clientY - ly)*0.005; lx = e.clientX; ly = e.clientY; }};
     window.onmouseup = () => drag = false;
-    
-    canvas.ontouchstart = (e) => { drag = true; lx = e.touches[0].clientX; ly = e.touches[0].clientY; };
-    window.ontouchmove = (e) => { 
-        if(drag) { ay += (e.touches[0].clientX - lx)*0.008; ax += (e.touches[0].clientY - ly)*0.008; lx = e.touches[0].clientX; ly = e.touches[0].clientY; }
-    };
-    window.ontouchend = () => drag = false;
     window.onwheel = (e) => { zoom = Math.max(50, zoom - e.deltaY * 0.5); };
+
+    // Touch (iOS / Android)
+    canvas.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+            drag = true;
+            lx = e.touches[0].clientX;
+            ly = e.touches[0].clientY;
+        } else if (e.touches.length === 2) {
+            drag = false; // Cancela rotação para priorizar zoom
+            initialDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+        }
+    }, { passive: false });
+
+    window.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 1 && drag) {
+            ay += (e.touches[0].clientX - lx) * 0.008;
+            ax += (e.touches[0].clientY - ly) * 0.008;
+            lx = e.touches[0].clientX;
+            ly = e.touches[0].clientY;
+        } else if (e.touches.length === 2 && initialDist !== null) {
+            let dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+            let diff = dist - initialDist;
+            zoom = Math.max(50, zoom + diff * 1.5);
+            initialDist = dist;
+        }
+        if(e.target === canvas) e.preventDefault();
+    }, { passive: false });
+
+    window.addEventListener('touchend', () => { drag = false; initialDist = null; });
 
     draw();
 })();
